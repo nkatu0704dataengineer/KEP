@@ -234,13 +234,15 @@ class PdfConverter:
                 for d in docs for p in d.paragraphs
             ]
             (dir_out / "all_paragraphs.json").write_text(
-                json.dumps(combined, indent=2, ensure_ascii=False)
+                json.dumps(combined, indent=2, ensure_ascii=False),
+                encoding="utf-8"
             )
         else:
             for d in docs:
                 payload = [{"Source": d.source, "Text": p} for p in d.paragraphs]
                 (dir_out / f"{d.source}_paragraphs.json").write_text(
-                    json.dumps(payload, indent=2, ensure_ascii=False)
+                    json.dumps(payload, indent=2, ensure_ascii=False),
+                    encoding="utf-8"
                 )
 
         summary = {

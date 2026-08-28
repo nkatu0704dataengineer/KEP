@@ -4,6 +4,7 @@ RITS (DeepSeek etc.) client – chat style HTTP API.
 
 from __future__ import annotations
 from typing import Any, Dict, List
+from pathlib import Path
 import requests
 import os
 
@@ -18,9 +19,16 @@ class RitsClient(LLMClient):
     def __init__(self, *, config: Dict[str, Any], debug: bool = False):
         super().__init__(config=config, debug=debug)
         
+        # Fallback to llm/rits/config.yaml if api_url/rits_api_key missing in passed config
+        base_cfg = {}
+        base_cfg_path = Path(__file__).parent / "config.yaml"
+        if base_cfg_path.exists():
+            from llm.config import load_client_cfg
+            base_cfg = load_client_cfg(str(base_cfg_path))
+
         # Prioritize environment variables over config file
-        self._url = os.getenv("RITS_API_URL") or config.get("api_url")
-        self._key = os.getenv("RITS_API_KEY") or config.get("rits_api_key")
+        self._url = os.getenv("RITS_API_URL") or config.get("api_url") or base_cfg.get("api_url")
+        self._key = os.getenv("RITS_API_KEY") or config.get("rits_api_key") or base_cfg.get("rits_api_key")
         
         if not self._url or not self._key:
             raise ValueError(

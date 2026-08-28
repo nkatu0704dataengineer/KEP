@@ -1,0 +1,17 @@
+# Môi tru?ng ?o Python
+kep-env/
+venv/
+
+# Thu m?c cache Python
+**/__pycache__/
+*.pyc
+
+# File ch?a thông tin b?o m?t (API Key, URL, ID)
+config/config.yaml
+llm/watsonx/config.yaml
+*.env
+
+# Thu m?c k?t qu? / PDF cá nhân (tùy ch?n)
+pdfs/
+results/
+runs/

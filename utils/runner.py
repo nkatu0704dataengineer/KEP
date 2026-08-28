@@ -101,9 +101,9 @@ class Runner:
 
         # persist
         (self.work_dir / "classified_full.json").write_text(
-            json.dumps(full_preds, indent=2, ensure_ascii=False))
+            json.dumps(full_preds, indent=2, ensure_ascii=False), encoding="utf-8")
         (self.work_dir / "classified_relevant.json").write_text(
-            json.dumps(relevant,   indent=2, ensure_ascii=False))
+            json.dumps(relevant,   indent=2, ensure_ascii=False), encoding="utf-8")
 
         # ---- 2) Extraction -------------------------------------------
         self.logger.info("▶ [Runner] Extraction (%s-shot)", self.prompt_mode)
@@ -120,7 +120,7 @@ class Runner:
         )
         struct_out, _ = ks.predict(relevant)
         (self.work_dir / "structured.json").write_text(
-            json.dumps(struct_out, indent=2, ensure_ascii=False))
+            json.dumps(struct_out, indent=2, ensure_ascii=False), encoding="utf-8")
 
         # ---- 3) Finish ----------------------------------------------
         self.meta.write(self.work_dir / "metadata.json")

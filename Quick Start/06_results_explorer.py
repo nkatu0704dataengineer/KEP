@@ -57,10 +57,14 @@ def discover_pipeline_runs():
     runs = []
     for run_dir in runs_dir.iterdir():
         if run_dir.is_dir():
-            # Check if it looks like a valid run
-            essential_files = ['structured.json', 'classified_relevant.json']
-            if any((run_dir / f).exists() for f in essential_files):
-                # Get modification time
+            # Check directly in run dir AND in extraction/classification subdirs
+            essential_files = [
+                run_dir / 'structured.json',
+                run_dir / 'classified_relevant.json',
+                run_dir / 'extraction' / 'structured.json',
+                run_dir / 'classification' / 'classified_relevant.json',
+            ]
+            if any(f.exists() for f in essential_files):
                 mtime = run_dir.stat().st_mtime
                 runs.append({
                     'name': run_dir.name,
@@ -107,24 +111,30 @@ def load_run_data(run_path):
     """Load all data from a pipeline run"""
     data = {}
     
-    # Define files to load
+    def resolve(candidates):
+        """Return first existing path from a list of candidates."""
+        for p in candidates:
+            if (run_path / p).exists():
+                return run_path / p
+        return None
+
+    # Define files to load, checking both flat and subdirectory layouts
     files_to_load = {
-        'all_paragraphs': 'ingest/all_paragraphs.json',
-        'classified_full': 'classified_full.json',
-        'classified_relevant': 'classified_relevant.json',
-        'structured': 'structured.json',
-        'general_metadata': 'general_metadata.json',
-        'llm_metadata': 'llm_metadata.json'
+        'all_paragraphs':      resolve(['ingest/all_paragraphs.json', 'all_paragraphs.json']),
+        'classified_full':     resolve(['classification/classified_full.json', 'classified_full.json']),
+        'classified_relevant': resolve(['classification/classified_relevant.json', 'classified_relevant.json']),
+        'structured':          resolve(['extraction/structured.json', 'structured.json']),
+        'general_metadata':    resolve(['general_metadata.json']),
+        'llm_metadata':        resolve(['llm_metadata.json']),
     }
     
-    for key, file_path in files_to_load.items():
-        full_path = run_path / file_path
-        if full_path.exists():
+    for key, full_path in files_to_load.items():
+        if full_path and full_path.exists():
             try:
-                with open(full_path, 'r') as f:
+                with open(full_path, 'r', encoding='utf-8') as f:
                     data[key] = json.load(f)
             except Exception as e:
-                print(f"⚠️ Could not load {file_path}: {e}")
+                print(f"⚠️ Could not load {full_path.name}: {e}")
                 data[key] = None
         else:
             data[key] = None

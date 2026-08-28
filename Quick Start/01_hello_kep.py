@@ -77,6 +77,7 @@ def main():
     print("└─────────────┘    └──────────────┘    └─────────────┘")
     print()
     
+    
     print_section("Stage 1: CONVERT 📄")
     print("• Converts PDF files to Markdown using Docling")
     print("• Splits documents into logical paragraphs or chunks")

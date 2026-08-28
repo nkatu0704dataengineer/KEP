@@ -275,7 +275,7 @@ def check_provider_access(kep_root):
         try:
             client = LLMFactory.create(
                 provider="watsonx",
-                model_name="mistralai/mistral-large",
+                model_name="meta-llama/llama-3-3-70b-instruct",
                 config_dir=str(kep_root / "llm")
             )
             

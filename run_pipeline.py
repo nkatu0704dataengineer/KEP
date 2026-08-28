@@ -16,7 +16,11 @@ New behaviour
 •  Metadata now reports example counts straight from the schema.
 """
 
-from __future__ import annotations
+import sys
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
 import yaml
 import argparse
@@ -49,8 +53,9 @@ ap.add_argument("--ext-schema")
 ap.add_argument("--work-dir",)
 ap.add_argument("--model-id",)
 ap.add_argument("--provider",)
-ap.add_argument("--prompt-modecl",    choices=["zero", "few"])
-ap.add_argument("--prompt-modeex",    choices=["zero", "few"])
+ap.add_argument("--prompt-mode",      choices=["zero", "few", "raw"])
+ap.add_argument("--prompt-modecl",    choices=["zero", "few", "raw"])
+ap.add_argument("--prompt-modeex",    choices=["zero", "few", "raw"])
 ap.add_argument("--num-exem",       type=int, default=0,     # kept for CLI compatibility (ignored in few-shot)
                 help="DEPRECATED – examples must live in the schema now")
 ap.add_argument("--chunk-strategy", choices=["fixed", "sentence", "paragraph"])
@@ -70,6 +75,14 @@ cli_args = vars(args)
 for key, value in cli_args.items():
     if value is not None:
         config[key] = value
+
+if args.prompt_mode:
+    config["prompt_mode_classification"] = args.prompt_mode
+    config["prompt_mode_extraction"] = args.prompt_mode
+if args.prompt_modecl:
+    config["prompt_mode_classification"] = args.prompt_modecl
+if args.prompt_modeex:
+    config["prompt_mode_extraction"] = args.prompt_modeex
 
 required_params = ['pdf_dir', 'classification_config', 'extraction_config']
 missing_params = [param for param in required_params if param not in config]
@@ -97,7 +110,7 @@ def _assert_examples(schema: dict[str, Any] | Path, stage: str):
     """
     Abort if --prompt-mode few is requested but the schema has no examples.
     """
-    if (config["prompt_mode_classification"] == "few" or config["prompt_mode_extraction"] == "few") and not _schema_has_examples(schema):
+    if (config.get("prompt_mode_classification") == "few" or config.get("prompt_mode_extraction") == "few") and not _schema_has_examples(schema):
         raise RuntimeError(
             f"Few-shot {stage} requested, but the schema provided has no 'examples' array."
         )
@@ -127,7 +140,7 @@ PdfConverter.convert_dir(
     chunk_overlap=config["chunk_overlap"],
 )
 paragraphs: List[Dict[str, Any]] = json.loads(
-    (INGEST / "all_paragraphs.json").read_text()
+    (INGEST / "all_paragraphs.json").read_text(encoding="utf-8")
 )
 
 # ─────────────────────────── 2) Classification ───────────────────────────
@@ -138,6 +151,25 @@ classification_config = load_client_cfg(classification_config_path)
 
 extraction_config_path = config.get("extraction_config")
 extraction_config = load_client_cfg(extraction_config_path)
+
+if config.get("cls_schema"):
+    cls_path = Path(config["cls_schema"]).resolve()
+    if cls_path.exists():
+        classification_config["classification_schema"] = load_yaml(cls_path)
+    else:
+        print(f"⚠️ Warning: cls_schema file '{cls_path}' not found, using default configuration schema.")
+if config.get("ext_schema"):
+    ext_path = Path(config["ext_schema"]).resolve()
+    if ext_path.exists():
+        extraction_config["extraction_schema"] = load_yaml(ext_path)
+    else:
+        print(f"⚠️ Warning: ext_schema file '{ext_path}' not found, using default configuration schema.")
+if config.get("provider"):
+    classification_config["provider"] = config["provider"]
+    extraction_config["provider"] = config["provider"]
+if config.get("model_id"):
+    classification_config["model_id"] = config["model_id"]
+    extraction_config["model_id"] = config["model_id"]
 _assert_examples(classification_config["classification_schema"], "classification")
 
 
@@ -162,10 +194,12 @@ for thread in threading.enumerate():
     print(f"Active Thread: {thread.name}")
     
 (WORK / "classification/classified_full.json").write_text(
-    json.dumps(pred_all, indent=2, ensure_ascii=False)
+    json.dumps(pred_all, indent=2, ensure_ascii=False),
+    encoding="utf-8"
 )
 (WORK / "classification/classified_relevant.json").write_text(
-    json.dumps(relevant_only, indent=2, ensure_ascii=False)
+    json.dumps(relevant_only, indent=2, ensure_ascii=False),
+    encoding="utf-8"
 )
 
 # ─────────────────────────── 3) Extraction ───────────────────────────
@@ -187,7 +221,8 @@ ks = ExtractorStructurer(
 structured, ext_prompt = ks.predict(relevant_only)
 
 (WORK / "extraction/structured.json").write_text(
-    json.dumps(structured, indent=2, ensure_ascii=False)
+    json.dumps(structured, indent=2, ensure_ascii=False),
+    encoding="utf-8"
 )
 
 # ─────────────────────────── 4) Metadata ───────────────────────────
@@ -211,7 +246,8 @@ META.write(WORK / "general_metadata.json")
         },
         indent=2,
         ensure_ascii=False,
-    )
+    ),
+    encoding="utf-8"
 )
 
 end_time = time.time()

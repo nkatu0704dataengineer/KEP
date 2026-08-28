@@ -33,17 +33,42 @@ class LLMFactory:
     @staticmethod
     def create(
         *, provider: str,
-        cfg: dict[str, Any],
-        debug: bool = False
+        cfg: dict[str, Any] | None = None,
+        config_dir: str | Path | None = None,
+        model_name: str | None = None,
+        debug: bool = False,
+        **kwargs: Any,
     ) -> LLMClient:
         """
         Parameters
         ----------
-        provider     – e.g. "watsonx" | "rits"
-        cfg   – config dict
+        provider   – e.g. "watsonx" | "rits"
+        cfg        – config dict (optional if config_dir or default directory is used)
+        config_dir – folder containing provider configurations
+        model_name – optional model name override
+        debug      – debug mode
         """
         from importlib import import_module
         provider = provider.lower()
+
+        if cfg is None:
+            base_dir = Path(config_dir) if config_dir else Path(__file__).parent
+            cfg_path = base_dir / provider / "config.yaml"
+            if not cfg_path.exists() and config_dir:
+                cfg_path = Path(config_dir) / provider / "config.yaml"
+            if not cfg_path.exists():
+                cfg_path = Path(__file__).parent / provider / "config.yaml"
+            cfg = load_client_cfg(str(cfg_path))
+        else:
+            cfg = dict(cfg)
+
+        if model_name:
+            if provider == "watsonx":
+                cfg["model_id"] = model_name
+            elif provider == "rits":
+                if "request_defaults" not in cfg or not isinstance(cfg["request_defaults"], dict):
+                    cfg["request_defaults"] = {}
+                cfg["request_defaults"]["model"] = model_name
 
         # --- dynamic import registers the concrete class via side-effect
         import_module(f"llm.{provider}.client")

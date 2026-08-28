@@ -4,6 +4,7 @@ Watsonx client – concrete implementation of `LLMClient`.
 
 from __future__ import annotations
 from typing import Any, Dict
+from pathlib import Path
 from ibm_watsonx_ai.foundation_models import ModelInference          # type: ignore
 import os
 
@@ -19,10 +20,18 @@ class WatsonxClient(LLMClient):
     def __init__(self, *, config: Dict[str, Any], debug: bool = False):
         super().__init__(config=config, debug=debug)
 
+        # Fallback to llm/watsonx/config.yaml if url/apikey are missing in passed config
+        base_cfg = {}
+        base_cfg_path = Path(__file__).parent / "config.yaml"
+        if base_cfg_path.exists():
+            from llm.config import load_client_cfg
+            base_cfg = load_client_cfg(str(base_cfg_path))
+
         # 1) credentials - prioritize environment variables over config file
-        url     = os.getenv("WATSONX_URL")     or config.get("url")
-        apikey  = os.getenv("WATSONX_APIKEY")  or config.get("apikey")
-        project_id = os.getenv("WATSONX_PROJECT_ID") or config.get("project_id")
+        url     = os.getenv("WATSONX_URL")     or config.get("url") or base_cfg.get("url")
+        apikey  = os.getenv("WATSONX_APIKEY")  or config.get("apikey") or base_cfg.get("apikey")
+        version = os.getenv("WATSONX_VERSION") or config.get("version") or base_cfg.get("version")
+        project_id = os.getenv("WATSONX_PROJECT_ID") or config.get("project_id") or base_cfg.get("project_id")
 
         if not url or not apikey:
             raise ValueError(
@@ -31,14 +40,18 @@ class WatsonxClient(LLMClient):
                 "or configure them in llm/watsonx/config.yaml"
             )
 
+        credentials: Dict[str, Any] = {"url": url, "apikey": apikey}
+        if version and "ml.cloud.ibm.com" not in url:
+            credentials["version"] = str(version)
+
         self._params  = config.get("hyperparameters", {})
         self._project = project_id
-        model_name = config["model_id"]
+        model_name = config.get("model_id")
         # 2) create SDK object ----------------------------------------------
         self._model = ModelInference(
             params=self._params,
-            model_id=config.get("model_id"),
-            credentials={"url": url, "apikey": apikey},
+            model_id=model_name,
+            credentials=credentials,
             project_id=self._project,
         )
         self._dbg(f"WatsonxClient ready – model={model_name}")

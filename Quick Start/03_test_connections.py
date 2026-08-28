@@ -154,6 +154,11 @@ def discover_watsonx_models(config, verbose=False):
         api_key = os.getenv('WATSONX_APIKEY') or config.get('apikey')
         project_id = os.getenv('WATSONX_PROJECT_ID') or config.get('project_id')
         url = os.getenv('WATSONX_URL') or config.get('url')
+        version = os.getenv('WATSONX_VERSION') or config.get('version')
+        
+        credentials = {"url": url, "apikey": api_key}
+        if version and "ml.cloud.ibm.com" not in url:
+            credentials["version"] = str(version)
         
         print("🔍 Discovering available models...")
         
@@ -162,7 +167,7 @@ def discover_watsonx_models(config, verbose=False):
             model = ModelInference(
                 model_id="invalid-model-for-discovery",
                 params={'max_new_tokens': 50},
-                credentials={"url": url, "apikey": api_key},
+                credentials=credentials,
                 project_id=project_id,
             )
         except Exception as e:
@@ -199,8 +204,9 @@ def discover_watsonx_models(config, verbose=False):
                 # Recommend good models
                 recommended = []
                 priority_models = [
-                    'mistralai/mistral-large',
                     'meta-llama/llama-3-3-70b-instruct',
+                    'mistralai/mistral-small-3-1-24b-instruct-2503',
+                    'mistralai/mistral-large',
                     'ibm/granite-13b-instruct-v2',
                     'meta-llama/llama-3-2-3b-instruct'
                 ]

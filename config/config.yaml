@@ -8,7 +8,7 @@ hyperparameters:
 
 # local client params
 api_access: "chat"        # chat | textgen -> generation mode selection
-model_id: "meta-llama/llama-3-405b-instruct"  # id of the model
+model_id: "meta-llama/llama-3-3-70b-instruct"  # id of the model
 classification_schema:
     PROMPT: |
       You are a meticulous scientific assistant. Your only job is to decide whether a paragraph is relevant to the technical core of a patent on battery-related materials and processes.

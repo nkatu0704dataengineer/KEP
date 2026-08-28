@@ -4,11 +4,14 @@ from .base import BaseParser
 
 # --- Installation Check and Safe Import for PyMuPDF, Pillow, and Tesseract ---
 try:
-    import fitz  # PyMuPDF
+    import pymupdf as fitz
 except ImportError:
-    print("Warning: 'pymupdf' is not installed. PyMuPDFParser will not be available.")
-    print("You can install it by running: pip install pymupdf")
-    fitz = None
+    try:
+        import fitz  # Legacy fallback
+    except ImportError:
+        print("Warning: 'pymupdf' is not installed. PyMuPDFParser will not be available.")
+        print("You can install it by running: pip install pymupdf")
+        fitz = None
 
 try:
     from PIL import Image

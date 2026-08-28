@@ -129,6 +129,11 @@ def discover_available_models():
         api_key = os.getenv('WATSONX_APIKEY') or config.get('apikey')
         project_id = os.getenv('WATSONX_PROJECT_ID') or config.get('project_id')
         url = os.getenv('WATSONX_URL') or config.get('url')
+        version = os.getenv('WATSONX_VERSION') or config.get('version')
+        
+        credentials = {"url": url, "apikey": api_key}
+        if version:
+            credentials["version"] = str(version)
         
         print("🔍 Discovering available models...")
         
@@ -137,7 +142,7 @@ def discover_available_models():
             model = ModelInference(
                 model_id="invalid-model-discovery",
                 params={'max_new_tokens': 50},
-                credentials={"url": url, "apikey": api_key},
+                credentials=credentials,
                 project_id=project_id,
             )
         except Exception as e:
@@ -202,9 +207,11 @@ def select_configuration(auto_mode=False):
     schemas_dir = kep_root / "schemas"
     schema_files = list(schemas_dir.glob("*.json"))
     
-    # Use PFAS schemas specifically
-    config["cls_schema"] = "./schemas/pfas_classification.json"
-    config["ext_schema"] = "./schemas/pfas_extraction.json"
+    # Use available schemas
+    cls_file = schemas_dir / "classification.json"
+    ext_file = schemas_dir / "extraction.json"
+    config["cls_schema"] = str(cls_file) if cls_file.exists() else (str(schema_files[0]) if schema_files else "./schemas/classification.json")
+    config["ext_schema"] = str(ext_file) if ext_file.exists() else (str(schema_files[-1]) if schema_files else "./schemas/extraction.json")
     
     # Get recommended model
     models, recommended_model = discover_available_models()
@@ -272,7 +279,7 @@ def select_configuration(auto_mode=False):
 def generate_pipeline_command(config):
     """Generate the pipeline command"""
     cmd_parts = [
-        "python", "run_pipeline.py",
+        sys.executable, "run_pipeline.py",
         "--pdf-dir", config["pdf_dir"],
         "--cls-schema", config["cls_schema"],
         "--ext-schema", config["ext_schema"],
@@ -353,12 +360,17 @@ def run_pipeline(config, dry_run=False):
     
     try:
         # Execute pipeline
+        env = os.environ.copy()
+        env["PYTHONIOENCODING"] = "utf-8"
         process = subprocess.Popen(
             cmd,
             cwd=kep_root,
+            env=env,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             bufsize=1,
             universal_newlines=True
         )
