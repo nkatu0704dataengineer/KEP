@@ -177,8 +177,15 @@ def extract_json_from_response(response_text: str) -> Union[Dict, List, Dict[str
     """
     json_blocks = []
 
-    # 1. Extração via markdown.
-    markdown_pattern = r"```(?:json)?\s*(\{.*?\})\s*```"
+    # 0. Direct parse attempt if string is already valid JSON (e.g. [], [{}], {})
+    cleaned_direct = response_text.strip()
+    try:
+        return json.loads(cleaned_direct)
+    except Exception:
+        pass
+
+    # 1. Extração via markdown (suporta tanto objeto {} quanto array []).
+    markdown_pattern = r"```(?:json)?\s*([\{\[].*?[\}\]])\s*```"
     markdown_matches = re.findall(markdown_pattern, response_text, re.DOTALL)
     if markdown_matches:
         for match in markdown_matches:
@@ -224,6 +231,10 @@ def extract_json_from_response(response_text: str) -> Union[Dict, List, Dict[str
         if len(json_blocks) == 1:
             return json_blocks[0]
         elif all(isinstance(block, dict) for block in json_blocks):
+            # If multiple dicts have overlapping keys (like separate extraction entries), return list
+            all_keys = [set(b.keys()) for b in json_blocks]
+            if any(all_keys[0].intersection(k) for k in all_keys[1:]):
+                return json_blocks
             merged = {}
             for block in json_blocks:
                 merged.update(block)

@@ -106,6 +106,19 @@ def _schema_has_examples(schema: Dict[str, Any]) -> bool:
         return False
 
 
+def _count_examples(schema: Dict[str, Any]) -> int:
+    """
+    Return the count of examples in the schema JSON.
+    """
+    try:
+        for k in EXAMPLE_KEYS:
+            if k in schema and isinstance(schema[k], list):
+                return len(schema[k])
+    except Exception:
+        pass
+    return 0
+
+
 def _assert_examples(schema: dict[str, Any] | Path, stage: str):
     """
     Abort if --prompt-mode few is requested but the schema has no examples.
@@ -207,7 +220,7 @@ _assert_examples(extraction_config["extraction_schema"], "extraction")
 LOGGER.info("Step 3/3  – Structured extraction (%s-shot)", config["prompt_mode_extraction"])
 
 ks = ExtractorStructurer(
-    config=load_client_cfg(extraction_config_path),
+    config=extraction_config,
     provider=extraction_config["provider"],
     schema_file=extraction_config["extraction_schema"],
     prompt_mode=config["prompt_mode_extraction"],
@@ -231,18 +244,21 @@ META.write(WORK / "general_metadata.json")
     json.dumps(
         {
             "timestamp":             timestamp,
+            "provider":              classification_config["provider"],
+            "model":                 classification_config["model_id"],
+            "prompt_mode":           config["prompt_mode_classification"],
             "classification_model":  classification_config["model_id"],
-            "extraction_model":                 extraction_config["model_id"],
-            "classification_provider":              classification_config["provider"],
-            "extraction_provider":                  extraction_config["provider"],
+            "extraction_model":      extraction_config["model_id"],
+            "classification_provider": classification_config["provider"],
+            "extraction_provider":   extraction_config["provider"],
             "prompt_mode_cl":        config["prompt_mode_classification"],
             "prompt_mode_ex":        config["prompt_mode_extraction"],
             "classification_prompt": cls_prompt,
             "extraction_prompt":     ext_prompt,
-            "cls_schema":            extraction_config["classification_schema"],
+            "cls_schema":            classification_config["classification_schema"],
             "ext_schema":            extraction_config["extraction_schema"],
-            "cls_example_count":     classification_config["classification_schema"].get("examples", []),
-            "ext_example_count":     extraction_config["extraction_schema"].get("examples", [])
+            "cls_example_count":     _count_examples(classification_config["classification_schema"]),
+            "ext_example_count":     _count_examples(extraction_config["extraction_schema"])
         },
         indent=2,
         ensure_ascii=False,

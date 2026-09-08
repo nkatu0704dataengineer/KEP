@@ -20,6 +20,10 @@ Usage:
 """
 
 import sys
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 import os
 import subprocess
 import json
@@ -310,9 +314,9 @@ def estimate_execution_time(kep_root, config):
     total_size_mb = sum(f.stat().st_size for f in pdf_files) / (1024 * 1024)
     
     # Rough estimates (very approximate)
-    conversion_time = len(pdf_files) * 30  # ~30 seconds per PDF for conversion
-    classification_time = total_size_mb * 20  # ~20 seconds per MB for classification
-    extraction_time = total_size_mb * 40  # ~40 seconds per MB for extraction (more complex)
+    conversion_time = int(len(pdf_files) * 30)  # ~30 seconds per PDF for conversion
+    classification_time = int(total_size_mb * 20)  # ~20 seconds per MB for classification
+    extraction_time = int(total_size_mb * 40)  # ~40 seconds per MB for extraction (more complex)
     
     total_estimate = conversion_time + classification_time + extraction_time
     
@@ -330,7 +334,7 @@ def estimate_execution_time(kep_root, config):
     
     return total_estimate
 
-def run_pipeline(config, dry_run=False):
+def run_pipeline(config, dry_run=False, auto_mode=False):
     """Execute the pipeline"""
     print_step("5", "Pipeline Execution")
     
@@ -348,7 +352,11 @@ def run_pipeline(config, dry_run=False):
     # Confirm execution
     print(f"\n📁 Output will be saved to: {config['work_dir']}")
     
-    confirm = input("\n🚀 Execute pipeline? (y/n): ").lower()
+    if auto_mode:
+        confirm = 'y'
+        print("\n🚀 Auto mode: Executing pipeline automatically...")
+    else:
+        confirm = input("\n🚀 Execute pipeline? (y/n): ").lower()
     if confirm != 'y':
         print("❌ Pipeline execution cancelled")
         return False
@@ -414,43 +422,49 @@ def preview_results(config):
         print("❌ Results directory not found")
         return
     
-    # Check output files
-    output_files = {
-        "ingest/all_paragraphs.json": "Converted PDF paragraphs",
-        "classified_full.json": "All paragraphs with classifications",
-        "classified_relevant.json": "Relevant paragraphs only",
-        "structured.json": "Final structured data",
-        "general_metadata.json": "Processing statistics",
-        "llm_metadata.json": "Model and prompt information",
-        "run.log": "Execution log"
-    }
+    # Check output files (supports both root and subdirectories)
+    output_files = [
+        ("ingest/all_paragraphs.json", ["ingest/all_paragraphs.json"], "Converted PDF paragraphs"),
+        ("classified_full.json", ["classification/classified_full.json", "classified_full.json"], "All paragraphs with classifications"),
+        ("classified_relevant.json", ["classification/classified_relevant.json", "classified_relevant.json"], "Relevant paragraphs only"),
+        ("structured.json", ["extraction/structured.json", "structured.json"], "Final structured data"),
+        ("general_metadata.json", ["general_metadata.json"], "Processing statistics"),
+        ("llm_metadata.json", ["llm_metadata.json"], "Model and prompt information"),
+        ("run.log", ["run.log"], "Execution log")
+    ]
     
     print("📊 Output Files:")
-    for file_path, description in output_files.items():
-        full_path = work_dir / file_path
-        if full_path.exists():
-            if full_path.suffix == '.json':
+    for display_name, candidates, description in output_files:
+        found_file = None
+        for candidate in candidates:
+            p = work_dir / candidate
+            if p.exists():
+                found_file = p
+                break
+        
+        if found_file:
+            if found_file.suffix == '.json':
                 try:
-                    with open(full_path, 'r') as f:
+                    with open(found_file, 'r', encoding='utf-8') as f:
                         data = json.load(f)
                     
                     if isinstance(data, list):
-                        print(f"   ✅ {file_path}: {len(data)} items")
+                        print(f"   ✅ {display_name}: {len(data)} items")
                     else:
-                        print(f"   ✅ {file_path}: {description}")
-                except:
-                    print(f"   ⚠️ {file_path}: exists but couldn't read")
+                        print(f"   ✅ {display_name}: {description}")
+                except Exception:
+                    print(f"   ⚠️ {display_name}: exists but couldn't read")
             else:
-                size_kb = full_path.stat().st_size / 1024
-                print(f"   ✅ {file_path}: {size_kb:.1f} KB")
+                size_kb = found_file.stat().st_size / 1024
+                print(f"   ✅ {display_name}: {size_kb:.1f} KB")
         else:
-            print(f"   ❌ {file_path}: missing")
+            print(f"   ❌ {display_name}: missing")
     
     # Show summary statistics
     metadata_file = work_dir / "general_metadata.json"
     if metadata_file.exists():
         try:
-            with open(metadata_file, 'r') as f:
+            with open(metadata_file, 'r', encoding='utf-8') as f:
                 metadata = json.load(f)
             
             print(f"\n📈 Processing Summary:")
@@ -462,10 +476,12 @@ def preview_results(config):
             pass
     
     # Preview structured data
-    structured_file = work_dir / "structured.json"
+    structured_file = work_dir / "extraction" / "structured.json"
+    if not structured_file.exists():
+        structured_file = work_dir / "structured.json"
     if structured_file.exists():
         try:
-            with open(structured_file, 'r') as f:
+            with open(structured_file, 'r', encoding='utf-8') as f:
                 structured_data = json.load(f)
             
             print(f"\n🏗️ Structured Data Preview:")
@@ -512,7 +528,7 @@ def main():
     estimate_execution_time(kep_root, config)
     
     # Run pipeline
-    success = run_pipeline(config, args.dry_run)
+    success = run_pipeline(config, args.dry_run, args.auto)
     
     if success and not args.dry_run:
         # Preview results
